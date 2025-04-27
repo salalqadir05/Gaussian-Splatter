@@ -8,19 +8,48 @@ use std::fs;
 use std::io;
 use wgpu::Buffer;
 use wgpu_types::Extent3d;
+use bevy::render::{
+    RenderApp,
+};
+use crate::config::Config;
+use crate::renderer::Renderer;
 
 #[derive(Component)]
 pub struct SplatBuffer {
     pub data: Vec<u8>,
 }
 
-pub struct BevyPlugin;
+pub struct GaussianSplatPlugin;
 
-impl Plugin for BevyPlugin {
+impl Plugin for GaussianSplatPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, load_splat_file) // Register the system correctly
-            .add_systems(Update, render_splats);
+        let render_app = app.sub_app_mut(RenderApp);
+
+        let config = Config {
+            surface_configuration: wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                width: 800,
+                height: 600,
+                present_mode: wgpu::PresentMode::Immediate,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                view_formats: vec![],
+            },
+            depth_sorting: crate::config::DepthSorting::Cpu,
+            use_covariance_for_scale: false,
+            use_unaligned_rectangles: false,
+            spherical_harmonics_order: 0,
+            max_splat_count: 1000,
+            radix_bits_per_digit: 1,
+            frustum_culling_tolerance: 0.1,
+            ellipse_margin: 0.01,
+            splat_scale: 1.0,
+        };
+
+        render_app
+            .insert_resource(config.clone())
+            .add_systems(Startup, setup_renderer)
+            .add_systems(Last, cleanup_renderer);
     }
 }
 
@@ -28,6 +57,24 @@ impl Plugin for BevyPlugin {
 pub struct GaussianSplat {
     pub splat_file: String,
     pub transform: Transform,
+}
+
+fn setup_renderer(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    config: Res<Config>,
+) {
+    let device = render_device.wgpu_device();
+    let mut renderer = Renderer::new(device, config.into_inner().clone());
+    if let Err(err) = renderer.initialize(device) {
+        error!("Failed to initialize renderer: {:?}", err);
+        return;
+    }
+    commands.insert_resource(renderer);
+}
+
+fn cleanup_renderer(mut renderer: ResMut<Renderer>) {
+    renderer.cleanup();
 }
 
 fn setup(mut commands: Commands) {

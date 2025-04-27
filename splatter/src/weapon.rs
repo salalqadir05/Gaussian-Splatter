@@ -1,10 +1,12 @@
 use bevy::prelude::*;
+use bevy::render::camera::Camera;
 
 pub struct WeaponPlugin;
 
 impl Plugin for WeaponPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, setup_weapon).add_systems(Update, weapon_controls);
+        app.add_systems(Startup, setup_weapon)
+           .add_systems(Update, (weapon_controls, update_bullets));
     }
 }
 
@@ -14,17 +16,17 @@ pub struct Weapon {
     pub last_shot: f32,
     pub ammo: i32,
     pub max_ammo: i32,
-    pub fire_timer: Timer, // Added timer for fire rate control
+    pub fire_timer: Timer,
 }
 
 impl Default for Weapon {
     fn default() -> Self {
         Self {
-            fire_rate: 0.5, // Default fire rate (seconds between shots)
+            fire_rate: 0.5,
             last_shot: 0.0,
             ammo: 30,
             max_ammo: 30,
-            fire_timer: Timer::from_seconds(0.5, TimerMode::Once), // Initialize fire timer
+            fire_timer: Timer::from_seconds(0.5, TimerMode::Once),
         }
     }
 }
@@ -33,6 +35,7 @@ impl Default for Weapon {
 pub struct Bullet {
     pub speed: f32,
     pub damage: f32,
+    pub direction: Vec3,
 }
 
 #[derive(Component)]
@@ -41,20 +44,17 @@ pub struct ReloadTimer {
     pub duration: Timer,
 }
 
-fn setup_weapon(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Load weapon texture and spawn it in the world
-    let texture_handle = asset_server.load("weapon.png");
+fn setup_weapon(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
+    // Spawn weapon model
     commands.spawn((
-        Weapon {
-            fire_rate: 0.5,
-            last_shot: 0.0,
-            ammo: 30,
-            max_ammo: 30,
-            fire_timer: Timer::from_seconds(0.5, TimerMode::Once),
-        },
-        SpriteBundle {
-            texture: texture_handle,
-            transform: Transform::from_xyz(0.3, -0.3, -0.1),
+        Weapon::default(),
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Box::new(0.1, 0.1, 0.3))),
+            material: materials.add(StandardMaterial {
+                base_color: Color::rgb(0.2, 0.2, 0.2),
+                ..default()
+            }),
+            transform: Transform::from_xyz(0.3, -0.2, -0.5),
             ..default()
         },
     ));
@@ -66,30 +66,67 @@ fn weapon_controls(
     mouse: Res<Input<MouseButton>>,
     keyboard: Res<Input<KeyCode>>,
     mut weapons: Query<(Entity, &mut Weapon)>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let (camera, camera_transform) = camera.single();
+    
     for (entity, mut weapon) in weapons.iter_mut() {
         // Handle reloading
         if keyboard.just_pressed(KeyCode::R) && weapon.ammo < weapon.max_ammo {
-            // Start the reload timer
-            commands.spawn((ReloadTimer {
-                weapon: entity,
-                duration: Timer::from_seconds(2.0, TimerMode::Once),
-            },));
+            commands.spawn((
+                ReloadTimer {
+                    weapon: entity,
+                    duration: Timer::from_seconds(2.0, TimerMode::Once),
+                },
+            ));
         }
 
         // Handle firing
         if mouse.pressed(MouseButton::Left) && weapon.ammo > 0 && time.elapsed_seconds() - weapon.last_shot >= weapon.fire_rate {
-            // Update last shot time and decrement ammo
             weapon.last_shot = time.elapsed_seconds();
             weapon.ammo -= 1;
 
-            // Spawn bullet (could include the position and movement logic)
+            // Calculate bullet spawn position and direction
+            let spawn_pos = camera_transform.translation();
+            let direction = camera_transform.forward();
+
+            // Spawn bullet
             commands.spawn((
-                Bullet { speed: 20.0, damage: 10.0 },
-                TransformBundle::from_transform(Transform::from_xyz(0.0, 0.0, 0.0)),
+                Bullet {
+                    speed: 20.0,
+                    damage: 10.0,
+                    direction,
+                },
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.05, sectors: 16, stacks: 16 })),
+                    material: materials.add(StandardMaterial {
+                        base_color: Color::rgb(1.0, 0.0, 0.0),
+                        ..default()
+                    }),
+                    transform: Transform::from_translation(spawn_pos),
+                    ..default()
+                },
             ));
 
             println!("Weapon fired! Ammo left: {}", weapon.ammo);
+        }
+    }
+}
+
+fn update_bullets(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut bullets: Query<(Entity, &Bullet, &mut Transform)>,
+) {
+    for (entity, bullet, mut transform) in bullets.iter_mut() {
+        // Move bullet in its direction
+        transform.translation += bullet.direction * bullet.speed * time.delta_seconds();
+
+        // Despawn bullet if it goes too far
+        if transform.translation.length() > 100.0 {
+            commands.entity(entity).despawn();
         }
     }
 }

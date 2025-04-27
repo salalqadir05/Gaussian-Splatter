@@ -25,7 +25,7 @@ pub enum DepthSorting {
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub surface_configuration: wgpu::SurfaceConfiguration, // ← Add this
+    pub surface_configuration: wgpu::SurfaceConfiguration,
     pub depth_sorting: DepthSorting,
     pub use_covariance_for_scale: bool,
     pub use_unaligned_rectangles: bool,
@@ -131,44 +131,23 @@ impl FromWorld for Renderer {
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
                 width: 800,
                 height: 600,
-                present_mode: wgpu::PresentMode::Fifo,
+                present_mode: wgpu::PresentMode::Immediate,
                 alpha_mode: wgpu::CompositeAlphaMode::Auto,
                 view_formats: vec![],
             },
-            depth_sorting: DepthSorting::Gpu,
+            depth_sorting: DepthSorting::Cpu,
             use_covariance_for_scale: false,
             use_unaligned_rectangles: false,
-            spherical_harmonics_order: 1,
-            max_splat_count: 100_000,
+            spherical_harmonics_order: 0,
+            max_splat_count: 10_000,
             radix_bits_per_digit: 1,
-            frustum_culling_tolerance: 0.0,
-            ellipse_margin: 0.0,
+            frustum_culling_tolerance: 0.1,
+            ellipse_margin: 0.01,
             splat_scale: 1.0,
         };
+
         let mut renderer = Renderer::new(&render_device.clone(), config.clone());
-        Renderer::new(
-            render_device,
-            Config {
-                surface_configuration: wgpu::SurfaceConfiguration {
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                    width: 800,
-                    height: 600,
-                    present_mode: wgpu::PresentMode::Fifo,
-                    alpha_mode: wgpu::CompositeAlphaMode::Auto,
-                    view_formats: vec![],
-                },
-                depth_sorting: crate::render_plugin::DepthSorting::Gpu,
-                use_covariance_for_scale: false,
-                use_unaligned_rectangles: false,
-                spherical_harmonics_order: 1,
-                max_splat_count: 100_000,
-                radix_bits_per_digit: 1,
-                frustum_culling_tolerance: 0.0,
-                ellipse_margin: 0.0,
-                splat_scale: 1.0,
-            },
-        );
+
         let sc = &config.surface_configuration;
         let depth_texture = render_device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth Texture"),
@@ -177,23 +156,33 @@ impl FromWorld for Renderer {
                 height: sc.height,
                 depth_or_array_layers: 1,
             },
-            mip_level_count: 1,                    // ← number of mipmap levels
-            sample_count: 1,                       // ← MSAA samples
-            dimension: wgpu::TextureDimension::D2, // ← 1D, 2D, or 3D
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[], // ← allowed view formats
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
         });
+
         renderer
     }
 }
 
 impl Renderer {
     pub fn new(_render_device: &RenderDevice, config: Config) -> Self {
-        Self { config, pipeline: None }
+        Self {
+            config,
+            pipeline: None,
+        }
     }
 
-    pub fn render_scene(&mut self, render_device: &RenderDevice, render_queue: &RenderQueue, view_target: &ViewTarget, shaders: Handle<Shader>) {
+    pub fn render_scene(
+        &mut self,
+        render_device: &RenderDevice,
+        render_queue: &RenderQueue,
+        view_target: &ViewTarget,
+        shaders: Handle<Shader>,
+    ) {
         let shader_handle = Handle::<Shader>::weak_from_u128(123456789);
         if !shaders.ge(&shader_handle) {
             return;
@@ -244,22 +233,23 @@ impl Renderer {
                     topology: wgpu::PrimitiveTopology::PointList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None,
+                    cull_mode: Some(wgpu::Face::Back),
                     polygon_mode: wgpu::PolygonMode::Fill,
                     unclipped_depth: false,
                     conservative: false,
                 },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
                 multiview: None,
             };
 
-            let render_pipeline = render_device.create_render_pipeline(&render_pipeline_descriptor);
-            self.pipeline = Some(render_pipeline);
+            self.pipeline = Some(render_device.create_render_pipeline(&render_pipeline_descriptor));
         }
 
         let texture = view_target.main_texture();

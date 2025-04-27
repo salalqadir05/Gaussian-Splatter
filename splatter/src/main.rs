@@ -2,6 +2,8 @@ use crate::player::PlayerPlugin;
 use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
+use bevy::render::camera::CameraRenderGraph;
+use bevy::render::view::VisibilityBundle;
 
 mod player;
 mod weapon;
@@ -11,7 +13,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Splatter Demo".to_string(),
-                resolution: (640.0, 480.0).into(),
+                resolution: (1280.0, 720.0).into(),
                 ..default()
             }),
             ..default()
@@ -22,12 +24,15 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
     // Camera
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
+    commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+            ..default()
+        },
+        CameraRenderGraph::new(bevy::core_pipeline::core_3d::graph::NAME),
+    ));
 
     // Light
     commands.spawn(PointLightBundle {
@@ -37,6 +42,28 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        ..default()
+    });
+
+    // Add some basic geometry to demonstrate depth rendering
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+        material: materials.add(StandardMaterial {
+            base_color: Color::rgb(0.8, 0.7, 0.6),
+            ..default()
+        }),
+        transform: Transform::from_xyz(0.0, 0.5, 0.0),
+        ..default()
+    });
+
+    // Add a plane for the floor
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Plane { size: 10.0, subdivisions: 1 })),
+        material: materials.add(StandardMaterial {
+            base_color: Color::rgb(0.3, 0.5, 0.3),
+            ..default()
+        }),
+        transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
     });
 }

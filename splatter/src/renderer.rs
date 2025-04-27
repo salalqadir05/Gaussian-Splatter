@@ -5,6 +5,7 @@ use wgpu::{BindGroupLayout, Buffer, CommandEncoder, ComputePipeline, Device, Que
 //use crate::config::{Config, DepthSorting}; // Assuming you have a Config struct
 use crate::config::{Config, DepthSorting};
 use std::borrow::Cow;
+use bevy::prelude::*;
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -14,62 +15,35 @@ struct Uniforms {
     params: [f32; 4], // z_near, z_far, frustum_culling_tolerance, ellipse_margin
     counts: [f32; 4], // splat_scale, splat_count, visible_entries.len(), padding
 }
+
+#[derive(Resource)]
 pub struct Renderer {
-    pub sorting_bind_group_layout: wgpu::BindGroupLayout,
-    pub compute_pipeline_layout: wgpu::PipelineLayout,
-    pub pipeline: RenderPipeline,
-    pub bind_group_layout: BindGroupLayout,
-    pub vertex_buffer: Buffer,
-
-    pub config: Config, // Add this line
-
-    pub entry_buffer_a: Buffer,     // Add this line
-    pub uniform_buffer: Buffer,     // Add this line
-    pub sorting_buffer: Buffer,     // Add this line
-    pub sorting_buffer_size: usize, // Add this line
-
-    pub radix_sort_a_pipeline: ComputePipeline,
-    pub workgroup_entries_a: u32,
-
-    pub radix_sort_b_pipeline: ComputePipeline,
-    pub radix_digit_places: u32,
-
-    pub radix_base: u32,
-    pub max_tile_count_c: u32,
-
-    pub radix_sort_c_pipeline: ComputePipeline,
-    pub workgroup_entries_c: u32,
+    pub pipeline: Option<RenderPipeline>,
+    pub bind_group_layout: Option<BindGroupLayout>,
+    pub vertex_buffer: Option<Buffer>,
+    pub config: Config,
+    pub uniform_buffer: Option<Buffer>,
 }
 
 impl Renderer {
-    pub fn new(device: &Device, surface_config: &wgpu::SurfaceConfiguration, config: Config) -> Result<Self, wgpu::Error> {
-        // ... (Your existing initialization code) ...
-        let sorting_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Sorting Bind Group Layout"),
+    pub fn new(device: &Device, config: Config) -> Self {
+        Self {
+            pipeline: None,
+            bind_group_layout: None,
+            vertex_buffer: None,
+            config,
+            uniform_buffer: None,
+        }
+    }
+
+    pub fn initialize(&mut self, device: &Device) -> Result<(), wgpu::Error> {
+        // Create bind group layout
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Gaussian Splat Bind Group Layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::COMPUTE,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -79,216 +53,128 @@ impl Renderer {
                 },
             ],
         });
-        let compute_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Compute Pipeline Layout"),
-            bind_group_layouts: &[&sorting_bind_group_layout],
+
+        // Create pipeline layout
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Gaussian Splat Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        // Example initialization for the new fields.  Adjust as needed.
-        let entry_buffer_a = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("entry_buffer_a"),
-            size: 1024, // Initial size, adjust as needed
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+        // Create shader
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Gaussian Splat Shader"),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders.wgsl"))),
         });
 
+        // Create render pipeline
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Gaussian Splat Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: self.config.surface_configuration.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::PointList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
+
+        // Create uniform buffer
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("uniform_buffer"),
-            size: 256, // Adjust as needed
+            label: Some("Uniform Buffer"),
+            size: std::mem::size_of::<Uniforms>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let sorting_buffer_size = 1024 * 1024; //Adjust
-        let sorting_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("sorting_buffer"),
-            size: sorting_buffer_size as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::INDIRECT,
-            mapped_at_creation: false,
-        });
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/radix_sort_a.wgsl").into()),
-        });
+        self.pipeline = Some(pipeline);
+        self.bind_group_layout = Some(bind_group_layout);
+        self.uniform_buffer = Some(uniform_buffer);
 
-        let radix_sort_a_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Radix Sort A Pipeline"),
-            layout: None,
-            module: &shader,
-            entry_point: "main",
-        });
-
-        let workgroup_entries_a = 64; // Example, adjust as needed
-
-        let shader_b = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/radix_sort_b.wgsl").into()),
-        });
-
-        let radix_sort_b_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Radix Sort B Pipeline"),
-            layout: None,
-            module: &shader_b,
-            entry_point: "main",
-        });
-
-        let radix_digit_places = 4; // Example, adjust as needed
-
-        let radix_base = 256; // Example, adjust as needed
-        let max_tile_count_c = 16; // Example, adjust as needed
-
-        let shader_c = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/radix_sort_c.wgsl").into()),
-        });
-
-        let radix_sort_c_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Radix Sort C Pipeline"),
-            layout: None,
-            module: &shader_c,
-            entry_point: "main",
-        });
-
-        let workgroup_entries_c = 64; // Example, adjust as needed
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("MyShader"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders.wgsl"))),
-            // defines: vec![
-            //     ("RADIX_BASE", "16u"),
-            //     ("RADIX_DIGIT_PLACES", "4u"),
-            //     // ...
-            // ]
-            // .into_iter()
-            // .collect(),
-        });
-
-        Ok(Self {
-            sorting_bind_group_layout,
-            compute_pipeline_layout,
-            pipeline: todo!(),
-            bind_group_layout: todo!(),
-            vertex_buffer: todo!(),
-            config,
-            entry_buffer_a,
-            uniform_buffer,
-            sorting_buffer,
-            sorting_buffer_size,
-            radix_sort_a_pipeline,
-            workgroup_entries_a,
-            radix_sort_b_pipeline,
-            radix_digit_places,
-            radix_base,
-            max_tile_count_c,
-            radix_sort_c_pipeline,
-            workgroup_entries_c,
-        })
+        Ok(())
     }
 
     pub fn render(&self, encoder: &mut CommandEncoder, view: &TextureView, queue: &Queue, scene: &mut Scene) {
-        let splat_count = scene.splat_count;
-        let entries = scene.splat_data.iter().map(|splat| splat.into()).collect::<Vec<SplatEntry>>();
+        if let Some(pipeline) = &self.pipeline {
+            if let Some(uniform_buffer) = &self.uniform_buffer {
+                // Update uniforms
+                let uniforms = Uniforms {
+                    projection: scene.camera.projection.to_cols_array_2d(),
+                    view: scene.camera.view.to_cols_array_2d(),
+                    params: [
+                        scene.camera.z_near,
+                        scene.camera.z_far,
+                        self.config.frustum_culling_tolerance,
+                        self.config.ellipse_margin,
+                    ],
+                    counts: [
+                        self.config.splat_scale,
+                        scene.splat_count as f32,
+                        0.0,
+                        0.0,
+                    ],
+                };
 
-        // CPU depth sorting
-        if matches!(self.config.depth_sorting, DepthSorting::Cpu) {
-            scene.splat_data.sort_by(|a, b| b.depth.partial_cmp(&a.depth).unwrap());
-        }
+                queue.write_buffer(uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
 
-        let mut visible_entries = vec![];
+                // Create render pass
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Gaussian Splat Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: true,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                });
 
-        for (index, splat) in scene.splat_data.iter().enumerate() {
-            let clip_space_position = scene.camera.get_clip_space_position(&Vec3::from(splat.center));
-            if clip_space_position.z > 0.0 && clip_space_position.z < 1.0 {
-                if clip_space_position.x.abs() < self.config.frustum_culling_tolerance
-                    && clip_space_position.y.abs() < self.config.frustum_culling_tolerance
-                {
-                    visible_entries.push(index as u32);
-                }
+                render_pass.set_pipeline(pipeline);
+                render_pass.draw(0..scene.splat_count as u32, 0..1);
             }
         }
+    }
 
-        queue.write_buffer(&self.entry_buffer_a, 0, bytemuck::cast_slice(&entries));
-
-        let uniforms = Uniforms {
-            projection: scene.camera.projection.to_cols_array_2d(),
-            view: scene.camera.view.to_cols_array_2d(),
-            params: [
-                scene.camera.z_near,
-                scene.camera.z_far,
-                self.config.frustum_culling_tolerance,
-                self.config.ellipse_margin,
-            ],
-            counts: [self.config.splat_scale, splat_count as f32, visible_entries.len() as f32, 0.0],
-        };
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
-
-        // GPU depth sorting
-        if matches!(self.config.depth_sorting, DepthSorting::Gpu | DepthSorting::GpuIndirectDraw) {
-            encoder.clear_buffer(&self.sorting_buffer, 0, None);
-
-            {
-                let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("radix_sort_a") });
-                compute_pass.set_pipeline(&self.radix_sort_a_pipeline);
-                compute_pass.dispatch_workgroups(
-                    (((splat_count as u32) + self.workgroup_entries_a - 1) / self.workgroup_entries_a) as u32,
-                    1,
-                    1,
-                );
-            }
-
-            {
-                let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("radix_sort_b") });
-                compute_pass.set_pipeline(&self.radix_sort_b_pipeline);
-                compute_pass.dispatch_workgroups(1, self.radix_digit_places as u32, 1);
-            }
-
-            for pass_index in 0..self.radix_digit_places {
-                encoder.copy_buffer_to_buffer(
-                    &self.sorting_buffer,
-                    (self.radix_base as u64 * self.max_tile_count_c as u64 * std::mem::size_of::<u32>() as u64) as u64,
-                    &self.sorting_buffer,
-                    0,
-                    (self.radix_base as u64 * self.max_tile_count_c as u64 * std::mem::size_of::<u32>() as u64) as u64,
-                );
-
-                let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("radix_sort_c") });
-                compute_pass.set_pipeline(&self.radix_sort_c_pipeline);
-                compute_pass.dispatch_workgroups(
-                    1,
-                    (((splat_count as u32) + self.workgroup_entries_c - 1) / self.workgroup_entries_c) as u32,
-                    1,
-                );
-            }
+    pub fn cleanup(&mut self) {
+        if let Some(buffer) = self.vertex_buffer.take() {
+            buffer.destroy();
         }
-
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
-
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, scene.render_bind_group.as_ref().unwrap(), &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
-        if matches!(self.config.depth_sorting, DepthSorting::GpuIndirectDraw) {
-            render_pass.draw_indirect(&self.sorting_buffer, (self.sorting_buffer_size - std::mem::size_of::<u32>() * 5) as u64);
-        } else {
-            render_pass.draw(0..6, 0..splat_count as u32);
+        if let Some(buffer) = self.uniform_buffer.take() {
+            buffer.destroy();
         }
     }
 }
 
-#[derive(Pod, Zeroable, Copy, Clone)]
 #[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SplatEntry {
     pub center: [f32; 3],
     pub color: [f32; 4],

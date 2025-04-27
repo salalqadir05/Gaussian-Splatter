@@ -1,14 +1,15 @@
 // src/config.rs
+use bevy::prelude::*;
 use wgpu::SurfaceConfiguration;
 // use wgpu::{CompositeAlphaMode, PresentMode, SurfaceConfiguration, TextureFormat, TextureUsages};
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Resource)]
 pub enum DepthSorting {
     Cpu,
     Gpu,
     GpuIndirectDraw,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Resource)]
 pub struct Config {
     pub surface_configuration: wgpu::SurfaceConfiguration, // ← Add this
     pub depth_sorting: DepthSorting,
