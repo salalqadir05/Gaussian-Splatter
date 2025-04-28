@@ -1,6 +1,6 @@
 // src/config.rs
 use bevy::prelude::*;
-use wgpu::SurfaceConfiguration;
+// use wgpu::SurfaceConfiguration;
 // use wgpu::{CompositeAlphaMode, PresentMode, SurfaceConfiguration, TextureFormat, TextureUsages};
 #[derive(Debug, Clone, Resource)]
 pub enum DepthSorting {

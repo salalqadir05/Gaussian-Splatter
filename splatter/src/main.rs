@@ -2,14 +2,15 @@ use crate::player::PlayerPlugin;
 use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
-use bevy::render::camera::CameraRenderGraph;
-use bevy::render::view::VisibilityBundle;
+// use bevy::render::camera::CameraRenderGraph;
+// use bevy::render::view::VisibilityBundle;
 
 mod player;
 mod weapon;
 
 fn main() {
     App::new()
+    // .add_plugins(DefaultPlugins)
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Splatter Demo".to_string(),
@@ -24,17 +25,27 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    // Camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        },
-        // CameraRenderGraph::new(bevy::core_pipeline::core_3d::graph::NAME),
-    ));
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    _camera_query: Query<Entity, With<Camera>>,
+) {
+    // Only spawn a camera if one doesn't already exist
+    // if camera_query.is_empty() {
+    //     commands.spawn((
+    //         Camera3dBundle {
+    //             camera: Camera {
+    //                 order: 0, // Set explicit order
+    //                 ..Default::default()
+    //             },
+    //             transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+    //             ..default()
+    //         },
+    //     ));
+    // }
 
-    // Light
+    // Add a light
     commands.spawn(PointLightBundle {
         point_light: PointLight {
             intensity: 1500.0,
@@ -44,8 +55,18 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
         ..default()
     });
+    commands.spawn(PointLightBundle {
+        point_light: PointLight {
+            intensity: 1000.0,  // Adjust intensity as needed
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(-4.0, 5.0, -4.0),  // Change the position
+        ..default()
+    });
 
-    // Add some basic geometry to demonstrate depth rendering
+
+    // Add basic geometry
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
         material: materials.add(StandardMaterial {
@@ -56,7 +77,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         ..default()
     });
 
-    // Add a plane for the floor
+    // Add floor plane
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 10.0, subdivisions: 1 })),
         material: materials.add(StandardMaterial {
@@ -67,7 +88,6 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         ..default()
     });
 }
-
 fn update_window_title(mut window: Query<&mut Window>, time: Res<Time>) {
     let mut window = window.single_mut();
     window.title = format!("Splatter Demo - {:.0} fps", 1.0 / time.delta_seconds());

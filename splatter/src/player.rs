@@ -1,11 +1,25 @@
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Camera;
-pub struct PlayerPlugin;
+use bevy::input::keyboard::KeyCode;
+struct CameraController {
+    _speed: f32,
+    _rotation_speed: f32,
+}
 
+impl Default for CameraController {
+    fn default() -> Self {
+        CameraController {
+            _speed: 5.0,
+            _rotation_speed: 1.0,
+        }
+    }
+}
+pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player)
+        app
+        .add_systems(Startup, spawn_player)
             .add_systems(Update, (player_movement, player_look));
     }
 }
@@ -37,12 +51,60 @@ fn spawn_player(mut commands: Commands) {
     commands.spawn((
         Player::default(),
         Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 1.7, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(0.0, 1.7, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
             camera: Camera { order: 0, ..default() },
             ..default()
         },
     ));
 }
+
+// fn spawn_player(mut commands: Commands) {
+//     commands.spawn((
+//         Player::default(),
+//         Camera3dBundle {
+//             transform: Transform::from_xyz(0.0, 1.7, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+//             camera: Camera { order: 0, ..default() },
+//             ..default()
+//         },
+//         CameraController::default(),
+//     ));
+// }
+
+// // A system to control the camera position dynamically based on user input
+// fn camera_movement(
+//     mut query: Query<(&mut Transform, &CameraController)>,
+//     keyboard_input: Res<Input<KeyCode>>,
+//     time: Res<Time>,
+// ) {
+//     for (mut transform, controller) in query.iter_mut() {
+//         let mut movement = Vec3::ZERO;
+
+//         // Moving the camera in different directions using the arrow keys or WASD
+//         if keyboard_input.pressed(KeyCode::W) {
+//             movement.z -= controller.speed * time.delta_seconds();
+//         }
+//         if keyboard_input.pressed(KeyCode::S) {
+//             movement.z += controller.speed * time.delta_seconds();
+//         }
+//         if keyboard_input.pressed(KeyCode::A) {
+//             movement.x -= controller.speed * time.delta_seconds();
+//         }
+//         if keyboard_input.pressed(KeyCode::D) {
+//             movement.x += controller.speed * time.delta_seconds();
+//         }
+
+//         // Apply the movement
+//         transform.translation += movement;
+
+//         // Optionally, add camera rotation control (left/right rotation)
+//         if keyboard_input.pressed(KeyCode::Left) {
+//             transform.rotate(Quat::from_rotation_y(controller.rotation_speed * time.delta_seconds()));
+//         }
+//         if keyboard_input.pressed(KeyCode::Right) {
+//             transform.rotate(Quat::from_rotation_y(-controller.rotation_speed * time.delta_seconds()));
+//         }
+//     }
+// }
 
 fn player_movement(
     time: Res<Time>,

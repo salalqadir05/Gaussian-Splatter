@@ -16,7 +16,7 @@ pub struct Weapon {
     pub last_shot: f32,
     pub ammo: i32,
     pub max_ammo: i32,
-    pub fire_timer: Timer,
+    pub _fire_timer: Timer,
 }
 
 impl Default for Weapon {
@@ -26,7 +26,7 @@ impl Default for Weapon {
             last_shot: 0.0,
             ammo: 30,
             max_ammo: 30,
-            fire_timer: Timer::from_seconds(0.5, TimerMode::Once),
+            _fire_timer: Timer::from_seconds(0.5, TimerMode::Once),
         }
     }
 }
@@ -34,31 +34,53 @@ impl Default for Weapon {
 #[derive(Component)]
 pub struct Bullet {
     pub speed: f32,
-    pub damage: f32,
+    pub _damage: f32,
     pub direction: Vec3,
 }
 
 #[derive(Component)]
 pub struct ReloadTimer {
-    pub weapon: Entity,
-    pub duration: Timer,
+    pub _weapon: Entity,
+    pub _duration: Timer,
 }
 
-fn setup_weapon(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    // Spawn weapon model
+// fn setup_weapon(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
+//     // Spawn weapon model
+//     commands.spawn((
+//         Weapon::default(),
+//         PbrBundle {
+//             mesh: meshes.add(Mesh::from(shape::Box::new(0.1, 0.1, 0.3))),
+//             material: materials.add(StandardMaterial {
+//                 base_color: Color::rgb(0.2, 0.2, 0.2),
+//                 ..default()
+//             }),
+//             transform: Transform::from_xyz(0.3, -0.2, -0.5),
+//             ..default()
+//         },
+//     ));
+// }
+
+
+fn setup_weapon(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>, // No need to pass meshes here
+    // mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Load the .glb model
+    let pistol_handle = asset_server.load("models/m249_saw_classic.glb");
+    // Spawn the weapon (pistol model) using the Scene component
     commands.spawn((
         Weapon::default(),
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Box::new(0.1, 0.1, 0.3))),
-            material: materials.add(StandardMaterial {
-                base_color: Color::rgb(0.2, 0.2, 0.2),
-                ..default()
-            }),
-            transform: Transform::from_xyz(0.3, -0.2, -0.5),
+        SceneBundle {
+            scene: pistol_handle.clone(),
+            transform: Transform::from_xyz(0.3, -0.2, -0.5).with_scale(Vec3::splat(0.1)),
             ..default()
         },
     ));
 }
+
+
+
 
 fn weapon_controls(
     mut commands: Commands,
@@ -71,14 +93,14 @@ fn weapon_controls(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Get the first camera and its transform
-    if let Some((camera, camera_transform)) = camera.iter().next() {
+    if let Some((_camera, camera_transform)) = camera.iter().next() {
         for (entity, mut weapon) in weapons.iter_mut() {
             // Handle reloading
             if keyboard.just_pressed(KeyCode::R) && weapon.ammo < weapon.max_ammo {
                 commands.spawn((
                     ReloadTimer {
-                        weapon: entity,
-                        duration: Timer::from_seconds(2.0, TimerMode::Once),
+                        _weapon: entity,
+                        _duration: Timer::from_seconds(2.0, TimerMode::Once),
                     },
                 ));
             }
@@ -92,20 +114,27 @@ fn weapon_controls(
                 let spawn_pos = camera_transform.translation();
                 let direction = camera_transform.forward();
 
+                // Calculate rotation to face the direction of the bullet
+                let bullet_rotation = Quat::from_rotation_arc(Vec3::Z, direction); // Rotate to align with the direction
+
                 // Spawn bullet
                 commands.spawn((
                     Bullet {
                         speed: 20.0,
-                        damage: 10.0,
+                        _damage: 10.0,
                         direction,
                     },
                     PbrBundle {
-                        mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.05, sectors: 16, stacks: 16 })),
+                        mesh: meshes.add(Mesh::from(shape::Capsule {
+                            radius: 0.05,
+                            depth: 0.25,
+                            ..default()
+                        })),
                         material: materials.add(StandardMaterial {
-                            base_color: Color::rgb(1.0, 0.0, 0.0),
+                            base_color: Color::rgb(1.0, 0.0, 0.0), // Red color for the bullet
                             ..default()
                         }),
-                        transform: Transform::from_translation(spawn_pos),
+                        transform: Transform::from_translation(spawn_pos).with_rotation(bullet_rotation),
                         ..default()
                     },
                 ));
@@ -118,7 +147,6 @@ fn weapon_controls(
         println!("No camera found in the scene.");
     }
 }
-
 
 fn update_bullets(
     mut commands: Commands,

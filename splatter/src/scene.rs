@@ -1,14 +1,14 @@
 use bevy::prelude::*;
-use bevy::render::render_resource::{BindGroup, Buffer as BevyBuffer};
-use bevy::render::renderer::{RenderDevice, RenderQueue};
-use bevy::render::texture::Image;
+use bevy::render::render_resource::Buffer as BevyBuffer;
+use bevy::render::renderer::RenderDevice;
+// use bevy::render::texture::Image;
 use bytemuck;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3, Vec4};
 use std::fs;
 pub struct ScenePlugin;
 use wgpu::util::BufferInitDescriptor;
-use wgpu::Buffer as WgpuBuffer;
+// use wgpu::Buffer as WgpuBuffer;
 #[repr(C)] // ensure C-compatible field ordering & alignment
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct ShaderSplat {
@@ -194,7 +194,7 @@ fn setup_scene(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mat
         ..default()
     });
 }
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
+fn _setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
         material: materials.add(Color::rgb(0.8, 0.8, 0.8).into()),

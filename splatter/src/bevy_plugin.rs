@@ -3,14 +3,12 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{TextureDimension, TextureFormat, TextureUsages};
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy::render::texture::Image;
-use glam::Mat4 as GlamMat4;
+// use glam::Mat4 as GlamMat4;
 use std::fs;
 use std::io;
-use wgpu::Buffer;
+// use wgpu::Buffer;
 use wgpu_types::Extent3d;
-use bevy::render::{
-    RenderApp,
-};
+use bevy::render::RenderApp;
 use crate::config::Config;
 use crate::renderer::Renderer;
 
@@ -77,7 +75,7 @@ fn cleanup_renderer(mut renderer: ResMut<Renderer>) {
     renderer.cleanup();
 }
 
-fn setup(mut commands: Commands) {
+fn _setup(mut commands: Commands) {
     commands.spawn((
         GaussianSplat {
             splat_file: "assets/splat_file.splat".to_string(),
@@ -97,7 +95,7 @@ pub enum FileReading {
     InvalidSplatSize,
 }
 
-fn load_splat_file(mut query: Query<(&GaussianSplat, &mut SplatBuffer)>, mut scene_query: Query<&mut Scene>) {
+fn _load_splat_file(mut query: Query<(&GaussianSplat, &mut SplatBuffer)>, mut scene_query: Query<&mut Scene>) {
     for (gaussian_splat, mut splat_buffer) in query.iter_mut() {
         if splat_buffer.data.is_empty() {
             // Only load if buffer is empty
@@ -122,11 +120,11 @@ fn load_splat_file(mut query: Query<(&GaussianSplat, &mut SplatBuffer)>, mut sce
         }
     }
 }
-fn render_splats(
+fn _render_splats(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     render_device: Res<RenderDevice>,
-    render_queue: Res<RenderQueue>,
+    _: Res<RenderQueue>,
     mut scene_query: Query<&mut Scene>,
 ) {
     let mut scene = scene_query.single_mut();

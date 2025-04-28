@@ -1,5 +1,5 @@
 // use crate::config::{Config, DepthSorting};
-use wgpu::SurfaceConfiguration;
+// use wgpu::SurfaceConfiguration;
 
 use crate::scene::Scene;
 use bevy::asset::Handle;
@@ -146,10 +146,10 @@ impl FromWorld for Renderer {
             splat_scale: 1.0,
         };
 
-        let mut renderer = Renderer::new(&render_device.clone(), config.clone());
+        let renderer = Renderer::new(&render_device.clone(), config.clone());
 
         let sc = &config.surface_configuration;
-        let depth_texture = render_device.create_texture(&wgpu::TextureDescriptor {
+        let _depth_texture = render_device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth Texture"),
             size: wgpu::Extent3d {
                 width: sc.width,

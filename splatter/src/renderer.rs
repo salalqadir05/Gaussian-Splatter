@@ -1,9 +1,9 @@
 use crate::scene::Scene;
-use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
-use wgpu::{BindGroupLayout, Buffer, CommandEncoder, ComputePipeline, Device, Queue, RenderPass, RenderPassDescriptor, RenderPipeline, TextureView};
+// use bytemuck::{Pod, Zeroable};
+// use glam::Vec3;
+use wgpu::{BindGroupLayout, Buffer, CommandEncoder, Device, Queue, RenderPipeline, TextureView};
 //use crate::config::{Config, DepthSorting}; // Assuming you have a Config struct
-use crate::config::{Config, DepthSorting};
+use crate::config::Config;
 use std::borrow::Cow;
 use bevy::prelude::*;
 
@@ -26,7 +26,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(device: &Device, config: Config) -> Self {
+    pub fn new(_device: &Device, config: Config) -> Self {
         Self {
             pipeline: None,
             bind_group_layout: None,
