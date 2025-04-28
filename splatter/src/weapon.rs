@@ -70,50 +70,55 @@ fn weapon_controls(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let (camera, camera_transform) = camera.single();
-    
-    for (entity, mut weapon) in weapons.iter_mut() {
-        // Handle reloading
-        if keyboard.just_pressed(KeyCode::R) && weapon.ammo < weapon.max_ammo {
-            commands.spawn((
-                ReloadTimer {
-                    weapon: entity,
-                    duration: Timer::from_seconds(2.0, TimerMode::Once),
-                },
-            ));
-        }
+    // Get the first camera and its transform
+    if let Some((camera, camera_transform)) = camera.iter().next() {
+        for (entity, mut weapon) in weapons.iter_mut() {
+            // Handle reloading
+            if keyboard.just_pressed(KeyCode::R) && weapon.ammo < weapon.max_ammo {
+                commands.spawn((
+                    ReloadTimer {
+                        weapon: entity,
+                        duration: Timer::from_seconds(2.0, TimerMode::Once),
+                    },
+                ));
+            }
 
-        // Handle firing
-        if mouse.pressed(MouseButton::Left) && weapon.ammo > 0 && time.elapsed_seconds() - weapon.last_shot >= weapon.fire_rate {
-            weapon.last_shot = time.elapsed_seconds();
-            weapon.ammo -= 1;
+            // Handle firing
+            if mouse.pressed(MouseButton::Left) && weapon.ammo > 0 && time.elapsed_seconds() - weapon.last_shot >= weapon.fire_rate {
+                weapon.last_shot = time.elapsed_seconds();
+                weapon.ammo -= 1;
 
-            // Calculate bullet spawn position and direction
-            let spawn_pos = camera_transform.translation();
-            let direction = camera_transform.forward();
+                // Calculate bullet spawn position and direction
+                let spawn_pos = camera_transform.translation();
+                let direction = camera_transform.forward();
 
-            // Spawn bullet
-            commands.spawn((
-                Bullet {
-                    speed: 20.0,
-                    damage: 10.0,
-                    direction,
-                },
-                PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.05, sectors: 16, stacks: 16 })),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::rgb(1.0, 0.0, 0.0),
+                // Spawn bullet
+                commands.spawn((
+                    Bullet {
+                        speed: 20.0,
+                        damage: 10.0,
+                        direction,
+                    },
+                    PbrBundle {
+                        mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.05, sectors: 16, stacks: 16 })),
+                        material: materials.add(StandardMaterial {
+                            base_color: Color::rgb(1.0, 0.0, 0.0),
+                            ..default()
+                        }),
+                        transform: Transform::from_translation(spawn_pos),
                         ..default()
-                    }),
-                    transform: Transform::from_translation(spawn_pos),
-                    ..default()
-                },
-            ));
+                    },
+                ));
 
-            println!("Weapon fired! Ammo left: {}", weapon.ammo);
+                println!("Weapon fired! Ammo left: {}", weapon.ammo);
+            }
         }
+    } else {
+        // Handle the case when no camera is found
+        println!("No camera found in the scene.");
     }
 }
+
 
 fn update_bullets(
     mut commands: Commands,
