@@ -2,6 +2,7 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Camera;
 use bevy::input::keyboard::KeyCode;
+use bevy::render::view::visibility::{InheritedVisibility, Visibility};
 struct CameraController {
     _speed: f32,
     _rotation_speed: f32,
@@ -20,7 +21,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
         .add_systems(Startup, spawn_player)
-            .add_systems(Update, (player_movement, player_look));
+            .add_systems(Update, (player_movement, player_look))
+        .add_systems(Update, fire_bullet);
     }
 }
 
@@ -46,16 +48,68 @@ impl Default for Player {
         }
     }
 }
+#[derive(Component)]
+// In components.rs
+pub struct Velocity(pub Vec3);
+#[derive(Component)]
 
-fn spawn_player(mut commands: Commands) {
-    commands.spawn((
-        Player::default(),
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 1.7, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-            camera: Camera { order: 0, ..default() },
-            ..default()
-        },
-    ));
+pub struct  Bullet;
+fn fire_bullet(
+    mut commands: Commands,
+    mouse_button_input: Res<Input<MouseButton>>,
+    query: Query<&Transform, With<Player>>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        if let Ok(player_transform) = query.get_single() {
+            // Spawn bullet in the direction the camera is looking
+            let forward = player_transform.forward();
+
+            commands.spawn((
+                Bullet,
+                PbrBundle {
+                    transform: Transform {
+                        translation: player_transform.translation + forward * 1.0,
+                        ..default()
+                    },
+                    ..default()
+                },
+                Velocity(forward * 20.0), // Custom component to handle movement
+            ));
+        }
+    }
+}
+
+
+fn spawn_player(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    commands
+        .spawn((
+            Player::default(),
+            InheritedVisibility::VISIBLE,
+            Visibility::Visible,
+            Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 1.7, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+                camera: Camera { order: 0, ..default() },
+                ..default()
+            },
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                SceneBundle {
+                    scene: asset_server.load("models/m249_saw_classic.glb#Scene0"),
+                    transform: Transform {
+                        translation: Vec3::new(0.2, -0.2, -0.5),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::splat(0.5),
+                    },
+                    ..default()
+                },
+                // InheritedVisibility::VISIBLE,
+                // Visibility::Visible,
+            ));
+        });
 }
 
 // fn spawn_player(mut commands: Commands) {

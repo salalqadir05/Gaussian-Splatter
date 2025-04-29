@@ -5,3 +5,4 @@ pub mod render_plugin; // New module for rendering
 pub mod renderer;
 pub mod scene;
 pub mod utils;
+pub mod player;

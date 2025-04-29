@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::camera::Camera;
-
+use crate::player::Player;
 pub struct WeaponPlugin;
 
 impl Plugin for WeaponPlugin {
@@ -63,20 +63,27 @@ pub struct ReloadTimer {
 
 fn setup_weapon(
     mut commands: Commands,
-    asset_server: Res<AssetServer>, // No need to pass meshes here
-    // mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+    query: Query<Entity, With<Player>>, // or whatever marker your player has
 ) {
-    // Load the .glb model
-    let pistol_handle = asset_server.load("models/m249_saw_classic.glb");
-    // Spawn the weapon (pistol model) using the Scene component
-    commands.spawn((
-        Weapon::default(),
-        SceneBundle {
-            scene: pistol_handle.clone(),
-            transform: Transform::from_xyz(0.3, -0.2, -0.5).with_scale(Vec3::splat(0.1)),
-            ..default()
-        },
-    ));
+    let gltf_scene: Handle<Scene> = asset_server.load("models/m249_saw_classic.glb#Scene0");
+
+    if let Ok(player_entity) = query.get_single() {
+        commands.entity(player_entity).with_children(|parent| {
+            parent.spawn((
+                Weapon::default(),
+                SceneBundle {
+                    scene: gltf_scene,
+                    transform: Transform {
+                        translation: Vec3::new(0.3, -0.3, 0.6), // Adjust for your model
+                        scale: Vec3::splat(0.01),              // Downscale if needed
+                        rotation: Quat::IDENTITY,
+                    },
+                    ..default()
+                },
+            ));
+        });
+    }
 }
 
 
