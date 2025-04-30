@@ -3,15 +3,21 @@ use geometric_algebra::{
     GeometricProduct, One, Signum, Transformation,
 };
 use splatter::{
-    renderer::{Configuration, DepthSorting, Renderer},
+    renderer::Renderer,
     scene::Scene,
 };
+// use splatter::scene::parse_file_header;
 use std::{collections::HashSet, env, fs::File};
-
+use bevy::prelude::*;
 mod application_framework;
-
-const LOAD_CHUNK_SIZE: usize = 0; // 1024 * 32;
-
+use splatter::config::{Config,DepthSorting as ConfigDeptSorting};
+const LOAD_CHUNK_SIZE: usize = 1024 * 32;  // Adjust to a reasonable size
+#[derive(Debug, Clone, Resource)]
+pub enum DepthSorting {
+    Cpu,
+    Gpu,
+    GpuIndirectDraw,
+}
 // src/config.rs
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -51,10 +57,9 @@ impl application_framework::Application for Application {
         let file = File::open(env::args().nth(1).unwrap()).unwrap();
         let renderer = Renderer::new(
             device,
-            surface_configuration,
-            Configuration {
+            Config {
                 surface_configuration: surface_configuration.clone(),
-                depth_sorting: DepthSorting::Gpu,
+                depth_sorting: ConfigDeptSorting::Gpu,
                 use_covariance_for_scale: true,
                 use_unaligned_rectangles: true,
                 spherical_harmonics_order: 1,
@@ -65,6 +70,7 @@ impl application_framework::Application for Application {
                 splat_scale: 1.0,
             },
         );
+        
         let (file_header_size, splat_count, mut file) = Scene::parse_file_header(file);
         let mut scene = Scene::new();
         let chunks_left_to_load = if LOAD_CHUNK_SIZE == 0 {
@@ -109,7 +115,6 @@ impl application_framework::Application for Application {
             ..wgpu::TextureViewDescriptor::default()
         }));
     }
-
     fn render(&mut self, device: &wgpu::Device, queue: &mut wgpu::Queue, frame: &wgpu::SurfaceTexture, frame_time: f32) {
         if self.chunks_left_to_load > 0 {
             self.chunks_left_to_load -= 1;
@@ -117,6 +122,7 @@ impl application_framework::Application for Application {
             self.scene.load_chunk(queue, &mut self.file, self.file_header_size, load_range);
             queue.submit([]);
         }
+    
         for keycode in &self.pressed_keys {
             let speed = frame_time * 2.0;
             match keycode {
@@ -153,11 +159,71 @@ impl application_framework::Application for Application {
                 _ => {}
             }
         }
-        let camera_motor = self.camera_translation.geometric_product(self.camera_rotation);
+    
+        let _camera_motor = self.camera_translation.geometric_product(self.camera_rotation);
         let frame_view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        self.renderer
-            .render_frame(device, queue, &frame_view, self.viewport_size, camera_motor, &self.scene);
+        
+        // Create the CommandEncoder
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+    
+        // Pass the correct arguments to the render function
+        self.renderer.render(&mut encoder, &frame_view, queue, &mut self.scene);
+    
+        // After rendering, submit the encoder to the queue
+        queue.submit(Some(encoder.finish()));
     }
+    
+    // fn render(&mut self, device: &wgpu::Device, queue: &mut wgpu::Queue, frame: &wgpu::SurfaceTexture, frame_time: f32) {
+    //     if self.chunks_left_to_load > 0 {
+    //         self.chunks_left_to_load -= 1;
+    //         let load_range = self.chunks_left_to_load * LOAD_CHUNK_SIZE..(self.chunks_left_to_load + 1) * LOAD_CHUNK_SIZE;
+    //         self.scene.load_chunk(queue, &mut self.file, self.file_header_size, load_range);
+    //         queue.submit([]);
+    //     }
+    //     for keycode in &self.pressed_keys {
+    //         let speed = frame_time * 2.0;
+    //         match keycode {
+    //             winit::event::VirtualKeyCode::A => {
+    //                 self.camera_translation += self.camera_rotation.transformation(Translator::new(0.0, speed, 0.0, 0.0));
+    //             }
+    //             winit::event::VirtualKeyCode::D => {
+    //                 self.camera_translation += self.camera_rotation.transformation(Translator::new(0.0, -speed, 0.0, 0.0));
+    //             }
+    //             winit::event::VirtualKeyCode::W => {
+    //                 self.camera_translation += self.camera_rotation.transformation(Translator::new(0.0, 0.0, 0.0, -speed));
+    //             }
+    //             winit::event::VirtualKeyCode::S => {
+    //                 self.camera_translation += self.camera_rotation.transformation(Translator::new(0.0, 0.0, 0.0, speed));
+    //             }
+    //             winit::event::VirtualKeyCode::Q => {
+    //                 self.camera_translation += self.camera_rotation.transformation(Translator::new(0.0, 0.0, -speed, 0.0));
+    //             }
+    //             winit::event::VirtualKeyCode::E => {
+    //                 self.camera_translation += self.camera_rotation.transformation(Translator::new(0.0, 0.0, speed, 0.0));
+    //             }
+    //             winit::event::VirtualKeyCode::Z => {
+    //                 self.camera_rotation = self
+    //                     .camera_rotation
+    //                     .geometric_product(rotate_around_axis(-0.5 * speed, &[0.0, 0.0, 1.0]))
+    //                     .signum();
+    //             }
+    //             winit::event::VirtualKeyCode::X => {
+    //                 self.camera_rotation = self
+    //                     .camera_rotation
+    //                     .geometric_product(rotate_around_axis(0.5 * speed, &[0.0, 0.0, 1.0]))
+    //                     .signum();
+    //             }
+    //             _ => {}
+    //         }
+    //     }
+    //     let camera_motor = self.camera_translation.geometric_product(self.camera_rotation);
+    //     let frame_view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+    //     self.renderer
+    //         .render(device, queue, &frame_view, self.viewport_size, camera_motor);
+    
+    // }
 
     fn mouse_motion(&mut self, delta: (f64, f64)) {
         let position = [

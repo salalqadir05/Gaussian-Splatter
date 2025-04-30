@@ -6,6 +6,8 @@ use bytemuck;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3, Vec4};
 use std::fs;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
 pub struct ScenePlugin;
 use wgpu::util::BufferInitDescriptor;
 // use wgpu::Buffer as WgpuBuffer;
@@ -71,6 +73,44 @@ pub struct Scene {
     pub sorting_buffer: Option<BevyBuffer>,
 }
 impl Scene {
+    pub fn load_chunk(
+        &mut self,
+        queue: &mut wgpu::Queue,
+        file: &mut File,
+        header_size: u16,
+        range: std::ops::Range<usize>,
+    ) {
+        file.seek(std::io::SeekFrom::Start(header_size as u64)).expect("Failed to seek file");
+
+        let chunk_size = range.end - range.start;
+        let mut buffer = vec![0u8; chunk_size]; 
+
+        file.read_exact(&mut buffer).expect("Failed to read chunk data");
+
+        self.process_chunk_data(queue, &buffer);
+
+    }
+
+    fn process_chunk_data(&mut self, _queue: &mut wgpu::Queue, _chunk_data: &[u8]) {
+        // Logic to process chunk data, like updating buffers, etc.
+        // This is just a placeholder; actual implementation will depend on the scene's requirements.
+        // Example:
+        // self.buffer.write(&chunk_data, queue);
+    }
+    pub fn parse_file_header(mut file: File) -> (u16, usize, File) {
+        let mut buffer = [0u8; 2]; // for u16
+        file.read_exact(&mut buffer).expect("Failed to read file header size");
+        let file_header_size = u16::from_le_bytes(buffer);
+
+        let mut buffer = [0u8; 8]; // for usize (assuming 64-bit)
+        file.read_exact(&mut buffer).expect("Failed to read splat count");
+        let splat_count = usize::from_le_bytes(buffer);
+
+        // Seek to the start of the splats (after the header)
+        file.seek(SeekFrom::Start(file_header_size as u64)).expect("Failed to seek to splat data");
+
+        (file_header_size, splat_count, file)
+    }
     pub fn new() -> Self {
         Self {
             splat_count: 0,

@@ -5,9 +5,10 @@ use geometric_algebra::{
 use splatter::{renderer::Renderer, scene::Scene};
 use std::{collections::HashSet, env, fs::File};
 mod application_framework;
+use splatter::config::{Config,DepthSorting as ConfigDeptSorting};
 
 // src/config.rs
-use wgpu::SurfaceConfiguration;
+// use wgpu::SurfaceConfiguration;
 // use wgpu::{CompositeAlphaMode, PresentMode, SurfaceConfiguration, TextureFormat, TextureUsages};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DepthSorting {
@@ -30,7 +31,7 @@ pub struct Configuration {
     pub splat_scale: f32,
 }
 
-const LOAD_CHUNK_SIZE: usize = 0; // 1024 * 32;
+const LOAD_CHUNK_SIZE: usize = 1024 * 32;  // Adjust to a reasonable size
 
 /// Creates a [Rotor] which represents a rotation by `angle` radians around `axis`.
 fn rotate_around_axis(angle: f32, axis: &[f32; 3]) -> Rotor {
@@ -52,32 +53,31 @@ struct Application {
 }
 
 impl application_framework::Application for Application {
-    fn new(device: &wgpu::Device, queue: &mut wgpu::Queue, surface_configuration: &wgpu::SurfaceConfiguration) -> Self {
+    fn new(device: &wgpu::Device, queue: &mut wgpu::Queue, _surface_configuration: &wgpu::SurfaceConfiguration) -> Self {
         let file = File::open(env::args().nth(1).unwrap()).unwrap();
-        let renderer = Renderer::new(
-            device,
-            surface_configuration,
-            Configuration {
-                surface_configuration: wgpu::SurfaceConfiguration {
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                    width: 800,
-                    height: 600,
-                    present_mode: wgpu::PresentMode::Fifo,
-                    alpha_mode: wgpu::CompositeAlphaMode::Auto,
-                    view_formats: vec![],
-                },
-                depth_sorting: crate::render_plugin::DepthSorting::Gpu,
-                use_covariance_for_scale: false,
-                use_unaligned_rectangles: false,
-                spherical_harmonics_order: 1,
-                max_splat_count: 1,
-                radix_bits_per_digit: 1,
-                frustum_culling_tolerance: 0.0,
-                ellipse_margin: 0.0,
-                splat_scale: 0.0,
+        let config = Config {
+            surface_configuration: wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                width: 800,
+                height: 600,
+                present_mode: wgpu::PresentMode::Fifo,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                view_formats: vec![],
             },
-        );
+            depth_sorting: ConfigDeptSorting::Gpu,
+            use_covariance_for_scale: false,
+            use_unaligned_rectangles: false,
+            spherical_harmonics_order: 1,
+            max_splat_count: 1,
+            radix_bits_per_digit: 1,
+            frustum_culling_tolerance: 0.0,
+            ellipse_margin: 0.0,
+            splat_scale: 0.0,
+        };
+        
+        let renderer = Renderer::new(device, config);
+        
         let (file_header_size, splat_count, mut file) = Scene::parse_file_header(file);
         let mut scene = Scene::new();
         let chunks_left_to_load = if LOAD_CHUNK_SIZE == 0 {
@@ -166,11 +166,21 @@ impl application_framework::Application for Application {
                 _ => {}
             }
         }
-        let camera_motor = self.camera_translation.geometric_product(self.camera_rotation);
+        let _camera_motor = self.camera_translation.geometric_product(self.camera_rotation);
         let frame_view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        self.renderer
-            .render_frame(device, queue, &frame_view, self.viewport_size, camera_motor, &self.scene);
+    
+        // Create the CommandEncoder
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+    
+        // Use the render function
+        self.renderer.render(&mut encoder, &frame_view, queue, &mut self.scene);
+    
+        // Submit the commands to the queue
+        queue.submit(Some(encoder.finish()));
     }
+    
 
     fn mouse_motion(&mut self, delta: (f64, f64)) {
         let position = [
