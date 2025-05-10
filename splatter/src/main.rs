@@ -3,17 +3,12 @@ use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
 use splatter::render_plugin::GaussianSplatRenderPlugin;
-use bevy::app::Plugin;
-use bevy::render::RenderApp;
-// use bevy::render::camera::CameraRenderGraph;
-// use bevy::render::view::VisibilityBundle;
 
 mod player;
 mod weapon;
 
 fn main() {
     App::new()
-    // .add_plugins(DefaultPlugins)
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Splatter Demo".to_string(),
