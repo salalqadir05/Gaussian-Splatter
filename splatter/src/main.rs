@@ -3,6 +3,7 @@ use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
 use splatter::render_plugin::GaussianSplatRenderPlugin;
+use bevy::render::RenderApp;
 
 mod player;
 mod weapon;
@@ -103,5 +104,15 @@ fn cursor_grab_system(mut window: Query<&mut Window>, mouse: Res<Input<MouseButt
     if key.just_pressed(KeyCode::Escape) {
         window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
         window.cursor.visible = true;
+    }
+}
+
+pub struct GaussianSplatRenderPlugin;
+
+impl Plugin for GaussianSplatRenderPlugin {
+    fn build(&self, app: &mut App) {
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app.add_systems(Startup, setup_renderer); // setup_renderer uses RenderDevice
+        // ... add other render systems here ...
     }
 }
