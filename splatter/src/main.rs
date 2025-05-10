@@ -2,6 +2,7 @@ use crate::player::PlayerPlugin;
 use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
+use splatter::render_plugin::GaussianSplatRenderPlugin;
 // use bevy::render::camera::CameraRenderGraph;
 // use bevy::render::view::VisibilityBundle;
 
@@ -19,7 +20,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((PlayerPlugin, WeaponPlugin))
+        .add_plugins((PlayerPlugin, WeaponPlugin, GaussianSplatRenderPlugin))
         .add_systems(Startup, setup)
         .add_systems(Update, (update_window_title, cursor_grab_system))
         .run();
