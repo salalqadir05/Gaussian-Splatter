@@ -9,7 +9,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use ply_rs::parser::Parser;
-use ply_rs::ply::{DefaultElement, PropertyAccess};
+use ply_rs::ply::DefaultElement;
 pub struct ScenePlugin;
 use wgpu::util::BufferInitDescriptor;
 // use wgpu::Buffer as WgpuBuffer;

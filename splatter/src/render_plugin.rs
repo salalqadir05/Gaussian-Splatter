@@ -53,8 +53,8 @@ impl Plugin for GaussianSplatRenderPlugin {
     fn build(&self, app: &mut App) {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .init_resource::<Renderer>()
-            .add_systems(ExtractSchedule, extract_splats.in_set(ExtractSplatSet));
+            .add_systems(ExtractSchedule, extract_splats.in_set(ExtractSplatSet))
+            .add_systems(bevy::render::Render, setup_renderer);
     }
 }
 
@@ -118,53 +118,6 @@ impl PhaseItem for GaussianSplatPhase {
 
     fn dynamic_offset_mut(&mut self) -> &mut Option<NonMaxU32> {
         panic!("dynamic_offset_mut() should not be called directly!")
-    }
-}
-
-impl FromWorld for Renderer {
-    fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-
-        let config = Config {
-            surface_configuration: wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                width: 800,
-                height: 600,
-                present_mode: wgpu::PresentMode::Immediate,
-                alpha_mode: wgpu::CompositeAlphaMode::Auto,
-                view_formats: vec![],
-            },
-            depth_sorting: DepthSorting::Cpu,
-            use_covariance_for_scale: false,
-            use_unaligned_rectangles: false,
-            spherical_harmonics_order: 0,
-            max_splat_count: 10_000,
-            radix_bits_per_digit: 1,
-            frustum_culling_tolerance: 0.1,
-            ellipse_margin: 0.01,
-            splat_scale: 1.0,
-        };
-
-        let renderer = Renderer::new(&render_device.clone(), config.clone());
-
-        let sc = &config.surface_configuration;
-        let _depth_texture = render_device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Depth Texture"),
-            size: wgpu::Extent3d {
-                width: sc.width,
-                height: sc.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-
-        renderer
     }
 }
 
@@ -285,4 +238,47 @@ impl Renderer {
 fn extract_splats(_commands: Commands, _scene: Res<Scene>) {
     // Extract splats from the scene
     // This is a placeholder for the actual extraction logic
+}
+
+fn setup_renderer(mut commands: Commands, render_device: Res<RenderDevice>) {
+    let config = Config {
+        surface_configuration: wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            width: 800,
+            height: 600,
+            present_mode: wgpu::PresentMode::Immediate,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
+        },
+        depth_sorting: DepthSorting::Cpu,
+        use_covariance_for_scale: false,
+        use_unaligned_rectangles: false,
+        spherical_harmonics_order: 0,
+        max_splat_count: 10_000,
+        radix_bits_per_digit: 1,
+        frustum_culling_tolerance: 0.1,
+        ellipse_margin: 0.01,
+        splat_scale: 1.0,
+    };
+
+    let renderer = Renderer::new(&render_device, config.clone());
+
+    let sc = &config.surface_configuration;
+    let _depth_texture = render_device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Depth Texture"),
+        size: wgpu::Extent3d {
+            width: sc.width,
+            height: sc.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[],
+    });
+
+    commands.insert_resource(renderer);
 }

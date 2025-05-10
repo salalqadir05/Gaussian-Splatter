@@ -3,7 +3,7 @@ use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
 use splatter::render_plugin::GaussianSplatRenderPlugin;
-use bevy::render::RenderApp;
+// use bevy::render::RenderApp;
 
 mod player;
 mod weapon;

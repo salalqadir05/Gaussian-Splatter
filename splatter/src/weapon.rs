@@ -81,7 +81,7 @@ fn weapon_controls(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Get the first camera and its transform
-    if let Some((_camera, camera_transform)) = camera.iter().next() {
+    if let Some((_camera, _camera_transform)) = camera.iter().next() {
         for (entity, mut weapon, weapon_transform) in weapons.iter_mut() {
             // Handle reloading
             if keyboard.just_pressed(KeyCode::R) && weapon.ammo < weapon.max_ammo {
