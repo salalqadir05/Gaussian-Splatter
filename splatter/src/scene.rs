@@ -8,6 +8,8 @@ use glam::{Mat4, Vec3, Vec4};
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use ply_rs::parser::Parser;
+use ply_rs::ply::{DefaultElement, PropertyAccess};
 pub struct ScenePlugin;
 use wgpu::util::BufferInitDescriptor;
 // use wgpu::Buffer as WgpuBuffer;
@@ -191,11 +193,82 @@ impl Scene {
 
         self.splat_count = self.splat_data.len(); // Remove as u32 cast, use usize
     }
-    // pub fn load_splat_file(&mut self, _path: &str) -> Vec<u8> {
-    //     // This is a placeholder implementation
-    //     // In a real implementation, you would read and parse the splat file
-    //     Vec::new()
-    // }
+    pub fn load_splats_from_ply(&mut self, path: &str) {
+        let mut f = std::fs::File::open(path).expect("Failed to open PLY file");
+        let mut reader = std::io::BufReader::new(&mut f);
+        let parser = Parser::<DefaultElement>::new();
+        let ply = parser.read_ply(&mut reader).expect("Failed to parse PLY");
+        let vertex_list = ply.payload.get("vertex").expect("No vertex element in PLY");
+        self.splat_data.clear();
+        for v in vertex_list {
+            let x = v.get("x").and_then(|p| match p {
+                ply_rs::ply::Property::Float(f) => Some(*f as f32),
+                ply_rs::ply::Property::Double(d) => Some(*d as f32),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32),
+                _ => None,
+            }).unwrap_or(0.0);
+
+            let y = v.get("y").and_then(|p| match p {
+                ply_rs::ply::Property::Float(f) => Some(*f as f32),
+                ply_rs::ply::Property::Double(d) => Some(*d as f32),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32),
+                _ => None,
+            }).unwrap_or(0.0);
+
+            let z = v.get("z").and_then(|p| match p {
+                ply_rs::ply::Property::Float(f) => Some(*f as f32),
+                ply_rs::ply::Property::Double(d) => Some(*d as f32),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32),
+                _ => None,
+            }).unwrap_or(0.0);
+
+            let r = v.get("red").and_then(|p| match p {
+                ply_rs::ply::Property::UChar(u) => Some(*u as f32 / 255.0),
+                ply_rs::ply::Property::Char(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32 / 255.0),
+                _ => None,
+            }).unwrap_or(1.0);
+
+            let g = v.get("green").and_then(|p| match p {
+                ply_rs::ply::Property::UChar(u) => Some(*u as f32 / 255.0),
+                ply_rs::ply::Property::Char(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32 / 255.0),
+                _ => None,
+            }).unwrap_or(1.0);
+
+            let b = v.get("blue").and_then(|p| match p {
+                ply_rs::ply::Property::UChar(u) => Some(*u as f32 / 255.0),
+                ply_rs::ply::Property::Char(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32 / 255.0),
+                _ => None,
+            }).unwrap_or(1.0);
+
+            let a = v.get("alpha").and_then(|p| match p {
+                ply_rs::ply::Property::UChar(u) => Some(*u as f32 / 255.0),
+                ply_rs::ply::Property::Char(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::Int(i) => Some(*i as f32 / 255.0),
+                ply_rs::ply::Property::UInt(u) => Some(*u as f32 / 255.0),
+                _ => None,
+            }).unwrap_or(1.0);
+
+            self.splat_data.push(Splat {
+                model_matrix: Mat4::IDENTITY,
+                center: [x, y, z],
+                color: [r, g, b, a],
+                depth: 0.0,
+                scale: [0.05, 0.05], // Default scale for splats
+                normal: [0.0, 1.0, 0.0], // Default normal
+                ellipse_basis: [1.0, 0.0, 0.0], // Default basis
+            });
+        }
+        self.splat_count = self.splat_data.len();
+    }
 
     // pub fn render(&mut self, render_device: Res<RenderDevice>, render_queue: Res<RenderQueue>, texture: &Image) {
     //     // Placeholder for rendering implementation
@@ -210,7 +283,9 @@ impl Default for Scene {
 
 fn setup_scene(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
     // Spawn the scene component
-    commands.spawn((Scene::default(), SpatialBundle::default()));
+    let mut scene = Scene::default();
+    scene.load_splats_from_ply("assets/models/test.ply");
+    commands.spawn((scene, SpatialBundle::default()));
 
     // Create a simple room
     commands.spawn(PbrBundle {
