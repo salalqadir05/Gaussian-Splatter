@@ -192,6 +192,7 @@ impl Scene {
             .collect();
 
         self.splat_count = self.splat_data.len(); // Remove as u32 cast, use usize
+        println!("Loaded {} splats from PLY", self.splat_data.len());
     }
     pub fn load_splats_from_ply(&mut self, path: &str) {
         let mut f = std::fs::File::open(path).expect("Failed to open PLY file");
@@ -268,6 +269,7 @@ impl Scene {
             });
         }
         self.splat_count = self.splat_data.len();
+        println!("Loaded {} splats from PLY", self.splat_data.len());
     }
 
     // pub fn render(&mut self, render_device: Res<RenderDevice>, render_queue: Res<RenderQueue>, texture: &Image) {
