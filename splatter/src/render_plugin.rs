@@ -51,6 +51,9 @@ pub struct GaussianSplatRenderPlugin;
 
 impl Plugin for GaussianSplatRenderPlugin {
     fn build(&self, app: &mut App) {
+        // Initialize Scene resource in the main app
+        app.init_resource::<Scene>();
+        
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .add_systems(ExtractSchedule, extract_splats.in_set(ExtractSplatSet))
@@ -235,9 +238,12 @@ impl Renderer {
     }
 }
 
-fn extract_splats(_commands: Commands, _scene: Res<Scene>) {
-    // Extract splats from the scene
-    // This is a placeholder for the actual extraction logic
+fn extract_splats(_commands: Commands, scene: Option<Res<Scene>>) {
+    // Only proceed if we have a scene
+    if let Some(scene) = scene {
+        // Extract splats from the scene
+        // This is a placeholder for the actual extraction logic
+    }
 }
 
 fn setup_renderer(mut commands: Commands, render_device: Res<RenderDevice>) {
