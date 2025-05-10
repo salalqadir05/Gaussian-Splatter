@@ -106,13 +106,3 @@ fn cursor_grab_system(mut window: Query<&mut Window>, mouse: Res<Input<MouseButt
         window.cursor.visible = true;
     }
 }
-
-pub struct GaussianSplatRenderPlugin;
-
-impl Plugin for GaussianSplatRenderPlugin {
-    fn build(&self, app: &mut App) {
-        let render_app = app.sub_app_mut(RenderApp);
-        render_app.add_systems(Startup, setup_renderer); // setup_renderer uses RenderDevice
-        // ... add other render systems here ...
-    }
-}
