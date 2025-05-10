@@ -3,6 +3,8 @@ use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
 use splatter::render_plugin::GaussianSplatRenderPlugin;
+use bevy::app::Plugin;
+use bevy::render::RenderApp;
 // use bevy::render::camera::CameraRenderGraph;
 // use bevy::render::view::VisibilityBundle;
 
@@ -89,6 +91,7 @@ fn setup(
         ..default()
     });
 }
+
 fn update_window_title(mut window: Query<&mut Window>, time: Res<Time>) {
     let mut window = window.single_mut();
     window.title = format!("Splatter Demo - {:.0} fps", 1.0 / time.delta_seconds());
