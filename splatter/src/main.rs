@@ -28,21 +28,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    _camera_query: Query<Entity, With<Camera>>,
 ) {
-    // Only spawn a camera if one doesn't already exist
-    // if camera_query.is_empty() {
-    //     commands.spawn((
-    //         Camera3dBundle {
-    //             camera: Camera {
-    //                 order: 0, // Set explicit order
-    //                 ..Default::default()
-    //             },
-    //             transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-    //             ..default()
-    //         },
-    //     ));
-    // }
 
     // Add a light
     commands.spawn(PointLightBundle {
