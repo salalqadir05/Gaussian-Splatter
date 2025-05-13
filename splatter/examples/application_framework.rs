@@ -309,8 +309,7 @@ impl ApplicationManager {
                         rolling_average / average_window.len() as f32,
                         1.0 / (rolling_average / average_window.len() as f32),
                     );
-
-                    // let frame = self.surface.get_current_texture().unwrap();
+                
                     match self.surface.get_current_texture() {
                         Ok(frame) => {
                             application.render(&self.device, &mut self.queue, &frame, frame_time);
@@ -321,7 +320,7 @@ impl ApplicationManager {
                         }
                         Err(wgpu::SurfaceError::Outdated) => {
                             log::warn!("Surface outdated. Needs to be reconfigured.");
-                            self.resize(&mut application, self.size); // Recreate the surface
+                            self.resize(&mut application, self.size);
                         }
                         Err(wgpu::SurfaceError::Lost) => {
                             log::error!("Surface lost. Recreating swapchain.");
@@ -332,13 +331,12 @@ impl ApplicationManager {
                             *control_flow = winit::event_loop::ControlFlow::Exit;
                         }
                     }
-                    
-                    application.render(&self.device, &mut self.queue, &frame, frame_time);
-                    frame.present();
+                
                     if CONTINUOUS_REDRAW {
                         self.window.request_redraw();
                     }
                 }
+                
                 _ => {}
             }
         });
