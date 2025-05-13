@@ -310,7 +310,29 @@ impl ApplicationManager {
                         1.0 / (rolling_average / average_window.len() as f32),
                     );
 
-                    let frame = self.surface.get_current_texture().unwrap();
+                    // let frame = self.surface.get_current_texture().unwrap();
+                    match self.surface.get_current_texture() {
+                        Ok(frame) => {
+                            application.render(&self.device, &mut self.queue, &frame, frame_time);
+                            frame.present();
+                        }
+                        Err(wgpu::SurfaceError::Timeout) => {
+                            log::warn!("Surface acquisition timeout. Skipping this frame.");
+                        }
+                        Err(wgpu::SurfaceError::Outdated) => {
+                            log::warn!("Surface outdated. Needs to be reconfigured.");
+                            self.resize(&mut application, self.size); // Recreate the surface
+                        }
+                        Err(wgpu::SurfaceError::Lost) => {
+                            log::error!("Surface lost. Recreating swapchain.");
+                            self.resize(&mut application, self.size);
+                        }
+                        Err(wgpu::SurfaceError::OutOfMemory) => {
+                            log::error!("Out of memory. Exiting.");
+                            *control_flow = winit::event_loop::ControlFlow::Exit;
+                        }
+                    }
+                    
                     application.render(&self.device, &mut self.queue, &frame, frame_time);
                     frame.present();
                     if CONTINUOUS_REDRAW {
