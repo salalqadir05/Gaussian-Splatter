@@ -3,11 +3,28 @@ use crate::weapon::WeaponPlugin;
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
 use splatter::render_plugin::GaussianSplatRenderPlugin;
+use splatter::bevy_plugin::GaussianSplatPlugin;
+use bevy::scene::ScenePlugin;
 // use bevy::render::RenderApp;
 
 mod player;
 mod weapon;
 
+// fn main() {
+//     App::new()
+//         .add_plugins(DefaultPlugins.set(WindowPlugin {
+//             primary_window: Some(Window {
+//                 title: "Splatter Demo".to_string(),
+//                 resolution: (1280.0, 720.0).into(),
+//                 ..default()
+//             }),
+//             ..default()
+//         }))
+//         .add_plugins((PlayerPlugin, WeaponPlugin, GaussianSplatRenderPlugin))
+//         .add_systems(Startup, setup)
+//         .add_systems(Update, (update_window_title, cursor_grab_system))
+//         .run();
+// }
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -18,11 +35,21 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((PlayerPlugin, WeaponPlugin, GaussianSplatRenderPlugin))
-        .add_systems(Startup, setup)
-        .add_systems(Update, (update_window_title, cursor_grab_system))
+        .add_plugins((
+            ScenePlugin,                    // Required for GLTF scene loading
+            GaussianSplatPlugin,            // Core splatting engine
+            GaussianSplatRenderPlugin,      // Your custom depth-aware splat renderer
+            PlayerPlugin,                   // Handles movement/camera
+            WeaponPlugin                    // Weapon logic + bullets
+        ))
+        .add_systems(Startup, setup) // Setup scene geometry or lighting
+        .add_systems(Update, (
+            update_window_title, 
+            cursor_grab_system
+        ))
         .run();
 }
+
 
 fn setup(
     mut commands: Commands,
