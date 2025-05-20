@@ -79,6 +79,24 @@ fn fire_bullet(
     }
 }
 
+fn camera_follow_system(
+    mut camera_query: Query<&mut Transform, With<Camera>>,
+    player_query: Query<&Transform, With<Player>>,
+    time: Res<Time>,
+) {
+    let player_transform = player_query.single();
+    let mut camera_transform = camera_query.single_mut();
+
+    // Desired camera position — slightly behind and above the player
+    let target_pos = player_transform.translation + Vec3::new(0.0, 1.7, 5.0);
+
+    // Smooth interpolation towards target position
+    let smooth_factor = 5.0;
+    camera_transform.translation = camera_transform.translation.lerp(target_pos, smooth_factor * time.delta_seconds());
+
+    // Look at player
+    camera_transform.look_at(player_transform.translation, Vec3::Y);
+}
 
 fn spawn_player(
     mut commands: Commands,
@@ -87,13 +105,13 @@ fn spawn_player(
     commands
         .spawn((
             Player::default(),
-            InheritedVisibility::VISIBLE,
-            Visibility::Visible,
             Camera3dBundle {
                 transform: Transform::from_xyz(0.0, 1.7, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-                camera: Camera { order: 0, ..default() },
+                camera: Camera { order: 1, ..default() },
                 ..default()
             },
+            InheritedVisibility::VISIBLE,
+            Visibility::Visible,
         ))
         .with_children(|parent| {
             parent.spawn((
